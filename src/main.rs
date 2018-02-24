@@ -26,7 +26,10 @@ fn handle_client(mut stream: TcpStream, addr: SocketAddr, sender: Sender<Action>
     loop {
         let mut buf = [0; 4096];
         if let Ok(n) = stream.read(&mut buf) {
-            sender.send(Action::Broadcast(addr, String::from_utf8(buf[0..n].to_vec()).unwrap()));
+            sender.send(Action::Broadcast(
+                addr,
+                String::from_utf8(buf[0..n].to_vec()).unwrap(),
+            ));
             stream.write(&buf[0..n]).unwrap();
         }
     }
@@ -39,8 +42,8 @@ fn main() {
     thread::spawn(move || loop {
         if let Ok((stream, addr)) = listener.accept() {
             {
-                        tx.send(Action::Add(addr, stream.try_clone().unwrap())).ok();
-        }
+                tx.send(Action::Add(addr, stream.try_clone().unwrap())).ok();
+            }
             let thread_tx = tx.clone();
             thread::spawn(move || {
                 handle_client(stream, addr, thread_tx);
