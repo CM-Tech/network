@@ -23,16 +23,22 @@ struct Server {
 fn handle_client(mut stream: TcpStream, addr: SocketAddr, sender: Sender<Action>) {
     stream.write(b"testing\n").unwrap();
     stream.flush().unwrap();
-    loop {
+    'read: loop {
         let mut buf = [0; 4096];
         if let Ok(n) = stream.read(&mut buf) {
-            sender.send(Action::Broadcast(
-                addr,
-                String::from_utf8(buf[0..n].to_vec()).unwrap(),
-            ));
+            if n == 0 {
+                break 'read;
+            }
+            sender
+                .send(Action::Broadcast(
+                    addr,
+                    String::from_utf8(buf[0..n].to_vec()).unwrap(),
+                ))
+                .ok();
             stream.write(&buf[0..n]).unwrap();
         }
     }
+    sender.send(Action::Remove(addr)).ok();
 }
 
 fn main() {
