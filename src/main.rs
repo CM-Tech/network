@@ -112,6 +112,19 @@ fn main() {
         }
     });
 
+    let (reader_send, reader_read): (Sender<String>, Receiver<String>) = mpsc::channel();
+    thread::spawn(move || 'read: loop {
+        let mut buf = [0; 4096];
+        if let Ok(n) = reader.read(&mut buf) {
+            if n == 0 {
+                break 'read;
+            }
+            reader_send
+                .send(String::from_utf8(buf.to_vec()).unwrap())
+                .ok();
+        }
+    });
+
     let mut connections = Server {
         connections: HashMap::new(),
     };
