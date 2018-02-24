@@ -129,7 +129,15 @@ fn main() {
             }
         }
         window.draw_2d(&e, |_c, g| {
-            clear([time.sin() / 2.0 + 0.5, 1.0, 0.5, 1.0], g);
+            clear(
+                [
+                    time.sin() / 2.0 + 0.5,
+                    (time + std::f32::consts::PI / 1.5).sin() / 2.0 + 0.5,
+                    (time + 2.0 * std::f32::consts::PI / 1.5).sin() / 2.0 + 0.5,
+                    1.0,
+                ],
+                g,
+            );
             time += 0.1;
         });
     }
