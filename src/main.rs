@@ -12,7 +12,7 @@ use std::io;
 enum Action {
     Add(SocketAddr, TcpStream),
     Remove(SocketAddr),
-    Broadcast(SocketAddr, String),
+    Broadcast(String),
 }
 
 struct Server {
@@ -20,12 +20,9 @@ struct Server {
 }
 
 impl Server {
-    fn broadcast(&mut self, from: &SocketAddr, msg: &String) {
+    fn broadcast(&mut self, msg: &String) {
         println!("broadcasting msg: {}", msg);
         for (addr, mut connection) in self.connections.iter_mut() {
-            if *from == *addr {
-                continue;
-            }
             connection.write(msg.as_bytes()).ok();
             connection.flush().ok();
         }
@@ -39,7 +36,7 @@ impl Server {
             addr
         );
         println!("{}", msg);
-        self.broadcast(addr, &(msg + "\n"));
+        self.broadcast(&(msg + "\n"));
     }
 
     fn remove_connection(&mut self, addr: &SocketAddr) {
@@ -50,7 +47,7 @@ impl Server {
             addr
         );
         println!("{}", msg);
-        self.broadcast(addr, &(msg + "\n"));
+        self.broadcast(&(msg + "\n"));
     }
 }
 
@@ -63,7 +60,6 @@ fn handle_client(mut stream: TcpStream, addr: SocketAddr, sender: Sender<Action>
             }
             sender
                 .send(Action::Broadcast(
-                    addr,
                     String::from_utf8(buf[0..n].to_vec()).unwrap(),
                 ))
                 .ok();
@@ -77,25 +73,25 @@ fn main() {
     println!("try connecting via `telnet localhost 8080`");
     println!("Would you like to \n 1) Connect to an existing socket? \n 2) Create a new socket?");
     let mut input = String::new();
-    let mut listener = None;
-    let reader: TcpStream;
-    if let Ok(_) = io::stdin().read_line(&mut input) {
-        match &*input {
-            "1\n" => {
-                println!("What is the ip of the socket you would like to connect to?");
-                input.clear();
-                if let Ok(_) = io::stdin().read_line(&mut input) {
-                    println!("asdf {}", input);
-                }
-                reader = TcpStream::connect(input + ":8080").unwrap();
+    io::stdin().read_line(&mut input).unwrap();
+    let (listener, mut reader) = match &*input {
+        "1\n" => {
+            println!("What is the ip of the socket you would like to connect to?");
+            input.clear();
+            if let Ok(n) = io::stdin().read_line(&mut input) {
+                input.remove(n - 1);
+                println!("{}", (input.clone() + ":8080"));
             }
-            "2\n" => {
-                listener = Some(TcpListener::bind("127.0.0.1:8080").unwrap());
-                reader = TcpStream::connect("127.0.0.1:8080").unwrap();
-            }
-            _ => (),
+            (None, TcpStream::connect(input + ":8080").unwrap())
         }
-    }
+        "2\n" => (
+            Some(TcpListener::bind("127.0.0.1:8080").unwrap()),
+            TcpStream::connect("127.0.0.1:8080").unwrap(),
+        ),
+        _ => (None, TcpStream::connect("127.0.0.1:8080").unwrap()),
+    };
+    let l = listener.is_some();
+    //}
 
     let (tx, rx): (Sender<Action>, Receiver<Action>) = mpsc::channel();
     thread::spawn(move || loop {
@@ -132,26 +128,34 @@ fn main() {
         .exit_on_esc(true)
         .build()
         .unwrap_or_else(|e| panic!("Failed to build PistonWindow: {}", e));
-    let mut time = 0f32;
+    let mut time = 0;
     while let Some(e) = window.next() {
-        if let Ok(message) = rx.try_recv() {
-            match message {
-                Action::Add(addr, stream) => connections.add_connection(&addr, stream),
-                Action::Remove(addr) => connections.remove_connection(&addr),
-                Action::Broadcast(addr, msg) => connections.broadcast(&addr, &msg),
+        if l {
+            if time % 10 == 0 {
+                connections.broadcast(&"tick".to_string());
             }
+            if let Ok(message) = rx.try_recv() {
+                match message {
+                    Action::Add(addr, stream) => connections.add_connection(&addr, stream),
+                    Action::Remove(addr) => connections.remove_connection(&addr),
+                    Action::Broadcast(msg) => connections.broadcast(&msg),
+                }
+            }
+        }
+        if let Ok(message) = reader_read.try_recv() {
+            println!("{}", message);
         }
         window.draw_2d(&e, |_c, g| {
             clear(
                 [
-                    time.sin() / 2.0 + 0.5,
-                    (time + std::f32::consts::PI / 1.5).sin() / 2.0 + 0.5,
-                    (time + 2.0 * std::f32::consts::PI / 1.5).sin() / 2.0 + 0.5,
+                    (time as f32 / 10.0).sin() / 2.0 + 0.5,
+                    (time as f32 / 10.0 + std::f32::consts::PI / 1.5).sin() / 2.0 + 0.5,
+                    (time as f32 / 10.0 + std::f32::consts::PI / 0.75).sin() / 2.0 + 0.5,
                     1.0,
                 ],
                 g,
             );
-            time += 0.1;
+            time += 1;
         });
     }
 }
