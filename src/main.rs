@@ -20,6 +20,43 @@ struct Server {
     connections: HashMap<SocketAddr, TcpStream>,
 }
 
+impl Server {
+    fn broadcast(&mut self, from: &SocketAddr, msg: &[u8]) {
+        println!(
+            "broadcasting msg: {}",
+            String::from_utf8(msg.to_vec()).unwrap()
+        );
+        for (addr, mut connection) in self.connections.iter_mut() {
+            if *from == *addr {
+                continue;
+            }
+            connection.write(msg).ok();
+            connection.flush().ok();
+        }
+    }
+
+    fn add_connection(&mut self, addr: &SocketAddr, stream: TcpStream) {
+        self.connections.insert(*addr, stream);
+        let msg = format!(
+            "({} connections) ----- new connection from {} -----",
+            self.connections.len(),
+            addr
+        );
+        println!("{}", msg);
+        self.broadcast(addr, (msg + "\n").as_bytes());
+    }
+
+    fn remove_connection(&mut self, addr: &SocketAddr) {
+        self.connections.remove(addr);
+        let msg = format!(
+            "({} connections) ----- {} is disconnected -----",
+            self.connections.len(),
+            addr
+        );
+        println!("{}", msg);
+        self.broadcast(addr, (msg + "\n").as_bytes());
+    }
+}
 fn handle_client(mut stream: TcpStream, addr: SocketAddr, sender: Sender<Action>) {
     stream.write(b"testing\n").unwrap();
     stream.flush().unwrap();
@@ -56,61 +93,14 @@ fn main() {
             });
         }
     });
-    let mut connections = HashMap::new();
+    let mut connections = Server {
+        connections: HashMap::new(),
+    };
     while let Ok(message) = rx.recv() {
         match message {
-            Action::Add(addr, stream) => add_connection(&mut connections, &addr, stream),
-            Action::Remove(addr) => remove_connection(&mut connections, &addr),
-            Action::Broadcast(addr, msg) => broadcast(&mut connections, &addr, msg.as_bytes()),
-        }
-        fn broadcast(
-            connections: &mut HashMap<SocketAddr, Connection>,
-            from: &SocketAddr,
-            msg: &[u8],
-        ) {
-            println!(
-                "broadcasting msg: {}",
-                String::from_utf8(msg.to_vec()).unwrap()
-            );
-            for (addr, mut connection) in connections.iter_mut() {
-                if *from == *addr {
-                    continue;
-                }
-                connection.stream.write(msg).ok();
-                connection.stream.flush().ok();
-            }
-        }
-
-        fn add_connection(
-            connections: &mut HashMap<SocketAddr, Connection>,
-            addr: &SocketAddr,
-            stream: TcpStream,
-        ) {
-            connections.insert(
-                *addr,
-                Connection {
-                    addr: *addr,
-                    stream: stream,
-                },
-            );
-            let msg = format!(
-                "({} connections) ----- new connection from {} -----",
-                connections.len(),
-                addr
-            );
-            println!("{}", msg);
-            broadcast(connections, addr, (msg + "\n").as_bytes());
-        }
-
-        fn remove_connection(connections: &mut HashMap<SocketAddr, Connection>, addr: &SocketAddr) {
-            connections.remove(addr);
-            let msg = format!(
-                "({} connections) ----- {} is disconnected -----",
-                connections.len(),
-                addr
-            );
-            println!("{}", msg);
-            broadcast(connections, addr, (msg + "\n").as_bytes());
+            Action::Add(addr, stream) => connections.add_connection(&addr, stream),
+            Action::Remove(addr) => connections.remove_connection(&addr),
+            Action::Broadcast(addr, msg) => connections.broadcast(&addr, msg.as_bytes()),
         }
     }
 }
