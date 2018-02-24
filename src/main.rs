@@ -9,11 +9,6 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::sync::mpsc;
 use std::io;
 
-pub struct Connection {
-    pub addr: SocketAddr,
-    pub stream: TcpStream,
-}
-
 enum Action {
     Add(SocketAddr, TcpStream),
     Remove(SocketAddr),
