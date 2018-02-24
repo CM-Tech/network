@@ -27,7 +27,7 @@ impl Server {
             if *from == *addr {
                 continue;
             }
-            connection.write(msg).ok();
+            connection.write(msg.as_bytes()).ok();
             connection.flush().ok();
         }
     }
@@ -54,6 +54,7 @@ impl Server {
         self.broadcast(addr, &(msg + "\n"));
     }
 }
+
 fn handle_client(mut stream: TcpStream, addr: SocketAddr, sender: Sender<Action>) {
     stream.write(b"testing\n").unwrap();
     stream.flush().unwrap();
@@ -69,7 +70,6 @@ fn handle_client(mut stream: TcpStream, addr: SocketAddr, sender: Sender<Action>
                     String::from_utf8(buf[0..n].to_vec()).unwrap(),
                 ))
                 .ok();
-            stream.write(&buf[0..n]).unwrap();
         }
     }
     sender.send(Action::Remove(addr)).ok();
@@ -99,7 +99,7 @@ fn main() {
         match message {
             Action::Add(addr, stream) => connections.add_connection(&addr, stream),
             Action::Remove(addr) => connections.remove_connection(&addr),
-            Action::Broadcast(addr, msg) => connections.broadcast(&addr, msg),
+            Action::Broadcast(addr, msg) => connections.broadcast(&addr, &msg),
         }
     }
 }
