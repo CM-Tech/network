@@ -1,0 +1,6 @@
+[package]
+name = "network"
+version = "0.1.0"
+authors = ["modderme123 <modderme123@gmail.com>"]
+
+[dependencies]
