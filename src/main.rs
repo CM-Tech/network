@@ -83,6 +83,7 @@ fn main() {
     println!("Would you like to \n 1) Connect to an existing socket? \n 2) Create a new socket?");
     let mut input = String::new();
     let mut listener = None;
+    let reader: TcpStream;
     if let Ok(_) = io::stdin().read_line(&mut input) {
         match &*input {
             "1\n" => {
@@ -91,9 +92,11 @@ fn main() {
                 if let Ok(_) = io::stdin().read_line(&mut input) {
                     println!("asdf {}", input);
                 }
+                reader = TcpStream::connect(format!("{}:8080",input)).unwrap();
             }
             "2\n" => {
                 listener = Some(TcpListener::bind("127.0.0.1:8080").unwrap());
+                reader = TcpStream::connect("127.0.0.1:8080").unwrap();
             }
             _ => (),
         }
