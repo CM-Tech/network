@@ -7,6 +7,7 @@ use std::thread;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::mpsc;
+use std::io;
 
 pub struct Connection {
     pub addr: SocketAddr,
@@ -59,8 +60,6 @@ impl Server {
 }
 
 fn handle_client(mut stream: TcpStream, addr: SocketAddr, sender: Sender<Action>) {
-    stream.write(b"testing\n").unwrap();
-    stream.flush().unwrap();
     'read: loop {
         let mut buf = [0; 4096];
         if let Ok(n) = stream.read(&mut buf) {
@@ -79,19 +78,39 @@ fn handle_client(mut stream: TcpStream, addr: SocketAddr, sender: Sender<Action>
 }
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
+    //let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
     println!("try connecting via `telnet localhost 8080`");
+    println!("Would you like to \n 1) Connect to an existing socket? \n 2) Create a new socket?");
+    let mut input = String::new();
+    let mut listener = None;
+    if let Ok(_) = io::stdin().read_line(&mut input) {
+        match &*input {
+            "1\n" => {
+                println!("What is the ip of the socket you would like to connect to?");
+                input.clear();
+                if let Ok(_) = io::stdin().read_line(&mut input) {
+                    println!("asdf {}", input);
+                }
+            }
+            "2\n" => {
+                listener = Some(TcpListener::bind("127.0.0.1:8080").unwrap());
+            }
+            _ => (),
+        }
+    }
 
     let (tx, rx): (Sender<Action>, Receiver<Action>) = mpsc::channel();
     thread::spawn(move || loop {
-        if let Ok((stream, addr)) = listener.accept() {
-            {
-                tx.send(Action::Add(addr, stream.try_clone().unwrap())).ok();
+        for l in listener.iter() {
+            if let Ok((stream, addr)) = l.accept() {
+                {
+                    tx.send(Action::Add(addr, stream.try_clone().unwrap())).ok();
+                }
+                let thread_tx = tx.clone();
+                thread::spawn(move || {
+                    handle_client(stream, addr, thread_tx);
+                });
             }
-            let thread_tx = tx.clone();
-            thread::spawn(move || {
-                handle_client(stream, addr, thread_tx);
-            });
         }
     });
 
