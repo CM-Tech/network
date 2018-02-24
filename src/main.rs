@@ -1,3 +1,6 @@
+extern crate piston_window;
+use piston_window::*;
+
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::io::{Read, Write};
 use std::thread;
@@ -95,11 +98,20 @@ fn main() {
     let mut connections = Server {
         connections: HashMap::new(),
     };
-    while let Ok(message) = rx.recv() {
-        match message {
-            Action::Add(addr, stream) => connections.add_connection(&addr, stream),
-            Action::Remove(addr) => connections.remove_connection(&addr),
-            Action::Broadcast(addr, msg) => connections.broadcast(&addr, &msg),
+    let mut window: PistonWindow = WindowSettings::new("Hello Piston!", (640, 480))
+        .exit_on_esc(true)
+        .build()
+        .unwrap_or_else(|e| panic!("Failed to build PistonWindow: {}", e));
+    while let Some(e) = window.next() {
+        if let Ok(message) = rx.try_recv() {
+            match message {
+                Action::Add(addr, stream) => connections.add_connection(&addr, stream),
+                Action::Remove(addr) => connections.remove_connection(&addr),
+                Action::Broadcast(addr, msg) => connections.broadcast(&addr, &msg),
+            }
         }
+        window.draw_2d(&e, |_c, g| {
+            clear([0.5, 1.0, 0.5, 1.0], g);
+        });
     }
 }
