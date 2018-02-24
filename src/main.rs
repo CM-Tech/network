@@ -15,7 +15,7 @@ struct Server {
     connections: HashMap<SocketAddr, TcpStream>,
 }
 
-fn handle_client(mut stream: TcpStream) {
+fn handle_client(mut stream: TcpStream, sender: Sender<Action>) {
     stream.write(b"testing").unwrap();
     stream.flush().unwrap();
     loop {
@@ -33,8 +33,9 @@ fn main() {
 
     loop {
         if let Ok((stream, addr)) = listener.accept() {
+            let thread_tx = tx.clone();
             thread::spawn(|| {
-                handle_client(stream);
+                handle_client(stream, thread_tx);
             });
         }
     }
