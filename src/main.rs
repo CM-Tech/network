@@ -21,11 +21,8 @@ struct Server {
 }
 
 impl Server {
-    fn broadcast(&mut self, from: &SocketAddr, msg: &[u8]) {
-        println!(
-            "broadcasting msg: {}",
-            String::from_utf8(msg.to_vec()).unwrap()
-        );
+    fn broadcast(&mut self, from: &SocketAddr, msg: &String) {
+        println!("broadcasting msg: {}", msg);
         for (addr, mut connection) in self.connections.iter_mut() {
             if *from == *addr {
                 continue;
@@ -43,7 +40,7 @@ impl Server {
             addr
         );
         println!("{}", msg);
-        self.broadcast(addr, (msg + "\n").as_bytes());
+        self.broadcast(addr, &(msg + "\n"));
     }
 
     fn remove_connection(&mut self, addr: &SocketAddr) {
@@ -54,7 +51,7 @@ impl Server {
             addr
         );
         println!("{}", msg);
-        self.broadcast(addr, (msg + "\n").as_bytes());
+        self.broadcast(addr, &(msg + "\n"));
     }
 }
 fn handle_client(mut stream: TcpStream, addr: SocketAddr, sender: Sender<Action>) {
@@ -81,6 +78,7 @@ fn handle_client(mut stream: TcpStream, addr: SocketAddr, sender: Sender<Action>
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
     println!("try connecting via `telnet localhost 8080`");
+
     let (tx, rx): (Sender<Action>, Receiver<Action>) = mpsc::channel();
     thread::spawn(move || loop {
         if let Ok((stream, addr)) = listener.accept() {
@@ -93,6 +91,7 @@ fn main() {
             });
         }
     });
+
     let mut connections = Server {
         connections: HashMap::new(),
     };
@@ -100,7 +99,7 @@ fn main() {
         match message {
             Action::Add(addr, stream) => connections.add_connection(&addr, stream),
             Action::Remove(addr) => connections.remove_connection(&addr),
-            Action::Broadcast(addr, msg) => connections.broadcast(&addr, msg.as_bytes()),
+            Action::Broadcast(addr, msg) => connections.broadcast(&addr, msg),
         }
     }
 }
