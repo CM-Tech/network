@@ -2,13 +2,13 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::io::{Read, Write};
 use std::thread;
 use std::collections::HashMap;
-use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::mpsc;
 
 enum Action {
     Add(SocketAddr, TcpStream),
     Remove(SocketAddr),
-    Broadcast(SocketAddr, String)
+    Broadcast(SocketAddr, String),
 }
 
 struct Server {
