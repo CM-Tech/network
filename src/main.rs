@@ -92,7 +92,7 @@ fn main() {
                 if let Ok(_) = io::stdin().read_line(&mut input) {
                     println!("asdf {}", input);
                 }
-                reader = TcpStream::connect(format!("{}:8080",input)).unwrap();
+                reader = TcpStream::connect(input + ":8080").unwrap();
             }
             "2\n" => {
                 listener = Some(TcpListener::bind("127.0.0.1:8080").unwrap());
