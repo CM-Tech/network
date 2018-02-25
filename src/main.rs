@@ -108,16 +108,18 @@ fn main() {
     let mut reader2 = reader.try_clone().unwrap();
 
     let (tx, rx): (Sender<Action>, Receiver<Action>) = mpsc::channel();
-    thread::spawn(move || loop {
+    thread::spawn(move || {
         for l in listener.iter() {
-            if let Ok((stream, addr)) = l.accept() {
-                {
-                    tx.send(Action::Add(addr, stream.try_clone().unwrap())).ok();
+            loop {
+                if let Ok((stream, addr)) = l.accept() {
+                    {
+                        tx.send(Action::Add(addr, stream.try_clone().unwrap())).ok();
+                    }
+                    let thread_tx = tx.clone();
+                    thread::spawn(move || {
+                        handle_client(stream, addr, thread_tx);
+                    });
                 }
-                let thread_tx = tx.clone();
-                thread::spawn(move || {
-                    handle_client(stream, addr, thread_tx);
-                });
             }
         }
     });
