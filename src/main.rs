@@ -128,10 +128,11 @@ fn main() {
         .exit_on_esc(true)
         .build()
         .unwrap_or_else(|e| panic!("Failed to build PistonWindow: {}", e));
-    let mut time = 0;
+    let mut time = 0f32;
     while let Some(e) = window.next() {
         if l {
-            if time % 10 == 0 {
+            if (time % 1.0) < 1e-5 {
+                println!("time");
                 connections.broadcast(&"tick".to_string());
             }
             if let Ok(message) = rx.try_recv() {
@@ -148,14 +149,14 @@ fn main() {
         window.draw_2d(&e, |_c, g| {
             clear(
                 [
-                    (time as f32 / 10.0).sin() / 2.0 + 0.5,
-                    (time as f32 / 10.0 + std::f32::consts::PI / 1.5).sin() / 2.0 + 0.5,
-                    (time as f32 / 10.0 + std::f32::consts::PI / 0.75).sin() / 2.0 + 0.5,
+                    time.sin() / 2.0 + 0.5,
+                    (time + std::f32::consts::PI / 1.5).sin() / 2.0 + 0.5,
+                    (time + std::f32::consts::PI / 0.75).sin() / 2.0 + 0.5,
                     1.0,
                 ],
                 g,
             );
-            time += 1;
+            time += 0.1;
         });
     }
 }
