@@ -1,3 +1,9 @@
+#[macro_use]
+extern crate serde_derive;
+
+extern crate serde;
+extern crate serde_json;
+
 extern crate piston_window;
 use piston_window::*;
 
@@ -21,7 +27,6 @@ struct Server {
 
 impl Server {
     fn broadcast(&mut self, msg: &String) {
-        println!("broadcasting msg: {}", msg);
         for (addr, mut connection) in self.connections.iter_mut() {
             connection.write(msg.as_bytes()).ok();
             connection.flush().ok();
@@ -36,7 +41,6 @@ impl Server {
             addr
         );
         println!("{}", msg);
-        self.broadcast(&(msg + "\n"));
     }
 
     fn remove_connection(&mut self, addr: &SocketAddr) {
@@ -47,7 +51,6 @@ impl Server {
             addr
         );
         println!("{}", msg);
-        self.broadcast(&(msg + "\n"));
     }
 }
 
@@ -68,8 +71,13 @@ fn handle_client(mut stream: TcpStream, addr: SocketAddr, sender: Sender<Action>
     sender.send(Action::Remove(addr)).ok();
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct Point {
+    x: f64,
+    y: f64,
+}
+
 fn main() {
-    //let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
     println!("try connecting via `telnet localhost 8080`");
     println!("Would you like to \n 1) Connect to an existing socket? \n 2) Create a new socket?");
     let mut input = String::new();
@@ -80,7 +88,6 @@ fn main() {
             input.clear();
             if let Ok(n) = io::stdin().read_line(&mut input) {
                 input.remove(n - 1);
-                println!("{}", (input.clone() + ":8080"));
             }
             (None, TcpStream::connect(input + ":8080").unwrap())
         }
@@ -91,7 +98,6 @@ fn main() {
         _ => (None, TcpStream::connect("127.0.0.1:8080").unwrap()),
     };
     let l = listener.is_some();
-    //}
 
     let (tx, rx): (Sender<Action>, Receiver<Action>) = mpsc::channel();
     thread::spawn(move || loop {
@@ -116,7 +122,7 @@ fn main() {
                 break 'read;
             }
             reader_send
-                .send(String::from_utf8(buf.to_vec()).unwrap())
+                .send(String::from_utf8_lossy(&buf[0..n]).to_string())
                 .ok();
         }
     });
@@ -129,11 +135,11 @@ fn main() {
         .build()
         .unwrap_or_else(|e| panic!("Failed to build PistonWindow: {}", e));
     let mut time = 0f32;
+    let mut players = vec![Point{x:50.0, y:50.0}];
     while let Some(e) = window.next() {
         if l {
             if (time % 1.0) < 1e-5 {
-                println!("time");
-                connections.broadcast(&"tick".to_string());
+                connections.broadcast(&serde_json::to_string(&players[0]).unwrap());
             }
             if let Ok(message) = rx.try_recv() {
                 match message {
@@ -144,9 +150,13 @@ fn main() {
             }
         }
         if let Ok(message) = reader_read.try_recv() {
-            println!("{}", message);
+            players[0] = serde_json::from_str(&message).unwrap();
         }
-        window.draw_2d(&e, |_c, g| {
+        match e.press_args() {
+            Some(Button::Keyboard(Key::L)) => players[0].x += 1.0,
+            _ => (),
+        };
+        window.draw_2d(&e, |c, g| {
             clear(
                 [
                     time.sin() / 2.0 + 0.5,
@@ -156,6 +166,14 @@ fn main() {
                 ],
                 g,
             );
+            for p in players.iter() {
+                rectangle(
+                    [1.0; 4],
+                    [p.x - 25.0, p.y - 25.0, 50.0, 50.0],
+                    c.transform,
+                    g,
+                )
+            }
             time += 0.1;
         });
     }
