@@ -27,7 +27,7 @@ struct Server {
 
 impl Server {
     fn broadcast(&mut self, msg: &String) {
-        for (addr, mut connection) in self.connections.iter_mut() {
+        for (_, mut connection) in self.connections.iter_mut() {
             connection.write(msg.as_bytes()).ok();
             connection.flush().ok();
         }
@@ -98,6 +98,7 @@ fn main() {
         _ => (None, TcpStream::connect("127.0.0.1:8080").unwrap()),
     };
     let l = listener.is_some();
+    let mut reader2 = reader.try_clone().unwrap();
 
     let (tx, rx): (Sender<Action>, Receiver<Action>) = mpsc::channel();
     thread::spawn(move || loop {
@@ -135,12 +136,9 @@ fn main() {
         .build()
         .unwrap_or_else(|e| panic!("Failed to build PistonWindow: {}", e));
     let mut time = 0f32;
-    let mut players = vec![Point{x:50.0, y:50.0}];
+    let mut players = vec![Point { x: 50.0, y: 50.0 }];
     while let Some(e) = window.next() {
         if l {
-            if (time % 1.0) < 1e-5 {
-                connections.broadcast(&serde_json::to_string(&players[0]).unwrap());
-            }
             if let Ok(message) = rx.try_recv() {
                 match message {
                     Action::Add(addr, stream) => connections.add_connection(&addr, stream),
@@ -150,10 +148,17 @@ fn main() {
             }
         }
         if let Ok(message) = reader_read.try_recv() {
+            println!("{}", message.len());
             players[0] = serde_json::from_str(&message).unwrap();
         }
         match e.press_args() {
-            Some(Button::Keyboard(Key::L)) => players[0].x += 1.0,
+            Some(Button::Keyboard(Key::L)) => {
+                players[0].x += 1.0;
+                reader2
+                    .write(&serde_json::to_string(&players[0]).unwrap().as_bytes())
+                    .ok();
+                reader2.flush().ok();
+            }
             _ => (),
         };
         window.draw_2d(&e, |c, g| {
